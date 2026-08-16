@@ -5,6 +5,11 @@ const ChatModerator = require('./moderator');
 const bot = new Telegraf(config.BOT_TOKEN);
 const moderator = new ChatModerator(config.MODERATION);
 
+// ====== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ОЧИСТКИ ТЕКСТА ======
+function normalize(text) {
+  return text.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 // ====== СТАРТ ======
 bot.start(async (ctx) => {
   const isAdmin = config.ADMIN_IDS.includes(ctx.from.id);
@@ -26,20 +31,15 @@ bot.start(async (ctx) => {
   await ctx.reply(msg, { parse_mode: 'HTML' });
 });
 
-// ====== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ: ОЧИСТКА ТЕКСТА ======
-function cleanText(text) {
-  return text.toLowerCase().trim().replace(/\s+/g, ' ');
-}
-
 // ====== ОСНОВНОЙ ОБРАБОТЧИК ======
 bot.on('text', async (ctx) => {
   try {
-    const text = ctx.message.text.trim();
+    const rawText = ctx.message.text;
+    const text = normalize(rawText);
     const uid = String(ctx.from.id);
-    const lowerText = cleanText(text);
 
     // === КТО Я ===
-    if (lowerText === 'кто я') {
+    if (text === 'кто я') {
       const stats = moderator.getUserStatus(uid);
       const user = ctx.from;
       let info = `🖤 <b>BLACK MODER — КТО Я</b> 🖤\n\n`;
@@ -55,7 +55,8 @@ bot.on('text', async (ctx) => {
     }
 
     // === ПРОВЕРКА: ЭТО КОМАНДА ДЛЯ АДМИНОВ? ===
-    const isAdminCmd = ['варн', 'снять варн', 'снять варны', 'мут', 'бан', 'размут', 'разбан', 'варны', 'кто ты'].some(c => lowerText.startsWith(c));
+    const adminCommands = ['варн', 'снять варн', 'снять варны', 'мут', 'бан', 'размут', 'разбан', 'варны', 'кто ты'];
+    const isAdminCmd = adminCommands.some(cmd => text === cmd || text.startsWith(cmd + ' '));
 
     if (isAdminCmd) {
       // Проверка админа
@@ -64,7 +65,7 @@ bot.on('text', async (ctx) => {
       }
 
       // === КТО ТЫ (ответом) ===
-      if (lowerText === 'кто ты') {
+      if (text === 'кто ты') {
         if (!ctx.message.reply_to_message) return ctx.reply('⚠️ Ответь на сообщение!');
         const target = ctx.message.reply_to_message.from;
         const stats = moderator.getUserStatus(String(target.id));
@@ -89,8 +90,8 @@ bot.on('text', async (ctx) => {
       const targetUid = String(target.id);
       const targetName = target.username || target.first_name || 'unknown';
 
-      // === СНЯТЬ ВАРН ===
-      if (lowerText === 'снять варн' || lowerText === 'снять варны') {
+      // === СНЯТЬ ВАРН (ГЛАВНОЕ!) ===
+      if (text === 'снять варн' || text === 'снять варны') {
         const user = moderator._initUser(targetUid);
         if (user.warns > 0) {
           user.warns -= 1;
@@ -103,7 +104,7 @@ bot.on('text', async (ctx) => {
       }
 
       // === ВАРН ===
-      if (lowerText === 'варн') {
+      if (text === 'варн') {
         const user = moderator._initUser(targetUid);
         user.warns += 1;
         let extra = '';
@@ -123,8 +124,8 @@ bot.on('text', async (ctx) => {
       }
 
       // === МУТ ===
-      if (lowerText.startsWith('мут')) {
-        const parts = text.split(' ');
+      if (text.startsWith('мут')) {
+        const parts = rawText.split(' ');
         let minutes = 5;
         if (parts.length > 1) {
           const parsed = parseInt(parts[1]);
@@ -149,7 +150,7 @@ bot.on('text', async (ctx) => {
       }
 
       // === БАН ===
-      if (lowerText === 'бан') {
+      if (text === 'бан') {
         const user = moderator._initUser(targetUid);
         user.isBanned = true;
         user.mutedUntil = Infinity;
@@ -161,7 +162,7 @@ bot.on('text', async (ctx) => {
       }
 
       // === РАЗМУТ ===
-      if (lowerText === 'размут') {
+      if (text === 'размут') {
         moderator.unmuteUser(targetUid);
         try {
           await ctx.restrictChatMember(targetUid, {
@@ -177,7 +178,7 @@ bot.on('text', async (ctx) => {
       }
 
       // === РАЗБАН ===
-      if (lowerText === 'разбан') {
+      if (text === 'разбан') {
         moderator.unbanUser(targetUid);
         try { await ctx.unbanChatMember(targetUid); } catch(e) {}
         moderator._log(`[РАЗБАН] @${targetName} (${targetUid})`);
@@ -186,7 +187,7 @@ bot.on('text', async (ctx) => {
       }
 
       // === ВАРНЫ ===
-      if (lowerText === 'варны') {
+      if (text === 'варны') {
         const stats = moderator.getUserStatus(targetUid);
         if (!stats) return ctx.reply(`📊 @${targetName}\n✅ Нарушений нет`);
         await ctx.reply(
