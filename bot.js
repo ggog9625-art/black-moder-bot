@@ -25,9 +25,11 @@ bot.start(async (ctx) => {
     message += '• Напиши "кто ты" → информация о боте\n';
     message += '• Напиши "стат" → статистика\n';
     message += '• Напиши "лог" → логи\n';
+    message += '• Напиши "помощь" → помощь\n';
   } else {
     message += '🔹 <b>Доступные команды:</b>\n';
     message += 'кто ты — информация о боте\n';
+    message += 'помощь — помощь\n';
   }
   
   await ctx.reply(message, { parse_mode: 'HTML' });
@@ -56,7 +58,7 @@ bot.on('text', async (ctx) => {
                       text.startsWith('помощь');
     
     if (isCommand) {
-      // Проверяем админа
+      // Проверяем админа (кроме команд для всех)
       if (!config.ADMIN_IDS.includes(ctx.from.id)) {
         if (text === 'кто ты' || text === 'помощь') {
           // Разрешаем всем
@@ -299,10 +301,12 @@ bot.on('text', async (ctx) => {
     }
     
     // === ЕСЛИ НЕ КОМАНДА — ПРОВЕРЯЕМ НА ТОКСИЧНОСТЬ ===
+    // Админов не модерят
     if (config.ADMIN_IDS.includes(ctx.from.id)) {
       return;
     }
     
+    // Пропускаем команды с /
     if (ctx.message.text.startsWith('/')) return;
     
     const chatId = ctx.chat.id;
