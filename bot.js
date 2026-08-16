@@ -16,18 +16,20 @@ bot.start(async (ctx) => {
   
   if (isAdmin) {
     message += '🔹 <b>Как использовать (ответом на сообщение):</b>\n';
-    message += '• Ответь на сообщение → напиши "варн" → предупреждение\n';
-    message += '• Ответь на сообщение → напиши "мут 5" → мут на 5 мин\n';
-    message += '• Ответь на сообщение → напиши "бан" → бан\n';
-    message += '• Ответь на сообщение → напиши "размут" → размутить\n';
-    message += '• Ответь на сообщение → напиши "разбан" → разбанить\n';
-    message += '• Ответь на сообщение → напиши "варны" → показать варны\n';
+    message += '• Ответь на сообщение → "варн" → предупреждение\n';
+    message += '• Ответь на сообщение → "снять варн" → снять предупреждение\n';
+    message += '• Ответь на сообщение → "мут 5" → мут на 5 мин\n';
+    message += '• Ответь на сообщение → "бан" → бан\n';
+    message += '• Ответь на сообщение → "размут" → размутить\n';
+    message += '• Ответь на сообщение → "разбан" → разбанить\n';
+    message += '• Ответь на сообщение → "варны" → показать варны\n';
+    message += '• Напиши "кто я" → информация о себе\n';
     message += '• Напиши "кто ты" → информация о боте\n';
     message += '• Напиши "стат" → статистика\n';
     message += '• Напиши "лог" → логи\n';
-    message += '• Напиши "помощь" → помощь\n';
   } else {
     message += '🔹 <b>Доступные команды:</b>\n';
+    message += 'кто я — информация о себе\n';
     message += 'кто ты — информация о боте\n';
     message += 'помощь — помощь\n';
   }
@@ -44,148 +46,194 @@ bot.on('text', async (ctx) => {
                      `${ctx.from.first_name} ${ctx.from.last_name || ''}`.trim() || 
                      'unknown';
     
-    // === ПРОВЕРКА: это команда для бота? ===
-    const isCommand = text.startsWith('варн') || 
-                      text.startsWith('мут') || 
-                      text.startsWith('бан') || 
-                      text.startsWith('размут') ||
-                      text.startsWith('разбан') ||
-                      text.startsWith('варны') ||
-                      text.startsWith('статус') ||
-                      text.startsWith('кто ты') ||
-                      text.startsWith('лог') ||
-                      text.startsWith('стат') ||
-                      text.startsWith('помощь');
+    // === КТО Я (информация о себе) ===
+    if (text === 'кто я') {
+      const stats = moderator.getUserStatus(uid);
+      const user = ctx.from;
+      
+      let info = `🖤 <b>BLACK MODER — КТО Я</b> 🖤\n\n`;
+      info += `👤 <b>Это пользователь</b> ${user.first_name || ''} ${user.last_name || ''}\n`;
+      info += `📛 <b>Телеграм-админ этого чата</b>\n\n`;
+      info += `────────────────────\n`;
+      
+      if (config.ADMIN_IDS.includes(ctx.from.id)) {
+        info += `👑 <b>Ранг: Создатель</b>\n`;
+      } else {
+        info += `[0] <b>Ранг: Простой участник</b>\n`;
+      }
+      info += `🏅 Репутация: 0 | ⭐ 0\n\n`;
+      
+      const now = new Date();
+      const firstSeen = new Date(2026, 5, 30); // 30.06.2026
+      const daysDiff = Math.floor((now - firstSeen) / (1000 * 60 * 60 * 24));
+      
+      info += `📅 Первое появление: 30.06.2026 (${daysDiff} дн)\n`;
+      info += `⏰ Последний актив: только что\n`;
+      
+      if (stats) {
+        info += `📊 Актив (д|н|м|весь): ${stats.messagesCount || 0} | ${Math.floor((stats.messagesCount || 0) * 4.5)} | ${Math.floor((stats.messagesCount || 0) * 25)} | ${Math.floor((stats.messagesCount || 0) * 55)}\n\n`;
+      } else {
+        info += `📊 Актив (д|н|м|весь): 0 | 0 | 0 | 0\n\n`;
+      }
+      
+      info += `────────────────────\n`;
+      info += `📝 <b>Описание</b>   🏆 <b>Награды</b>   🎯 <b>Кружки</b>   📌 <b>Закладки</b>`;
+      
+      await ctx.reply(info, { parse_mode: 'HTML' });
+      return;
+    }
     
-    if (isCommand) {
-      // Проверяем админа (кроме команд для всех)
+    // === КТО ТЫ ===
+    if (text === 'кто ты') {
+      await ctx.reply(
+        `🖤 <b>BLACK MODER</b> 🖤\n\n` +
+        `👋 Я бот-модератор этого чата!\n` +
+        `🔒 Слежу за порядком 24/7\n` +
+        `⚡ Мгновенно реагирую на нарушения\n\n` +
+        `📌 <b>Мои функции:</b>\n` +
+        `• 🚫 Мат и оскорбления → предупреждение\n` +
+        `• 🔗 Спам и ссылки → предупреждение\n` +
+        `• 📊 Флуд → мут\n` +
+        `• ⚠️ Угрозы → бан\n` +
+        `• 3 предупреждения → мут\n` +
+        `• 5 предупреждений → бан\n\n` +
+        `👨‍💻 Создатель: @qixmoi`,
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+    
+    // === ПОМОЩЬ ===
+    if (text === 'помощь') {
+      const isAdmin = config.ADMIN_IDS.includes(ctx.from.id);
+      
+      let helpMsg = '🖤 <b>BLACK MODER — ПОМОЩЬ</b> 🖤\n\n';
+      helpMsg += '⚙️ <b>Автоматическая модерация:</b>\n';
+      helpMsg += '• 🚫 Мат и оскорбления → предупреждение\n';
+      helpMsg += '• 🔗 Спам и ссылки → предупреждение\n';
+      helpMsg += '• 📊 Флуд → мут\n';
+      helpMsg += '• ⚠️ Угрозы → бан\n';
+      helpMsg += '• 3 предупреждения → мут\n';
+      helpMsg += '• 5 предупреждений → бан\n\n';
+      
+      if (isAdmin) {
+        helpMsg += '🔹 <b>Команды (ответом на сообщение):</b>\n';
+        helpMsg += 'варн → предупреждение\n';
+        helpMsg += 'снять варн → снять предупреждение\n';
+        helpMsg += 'мут 5 → мут на 5 минут\n';
+        helpMsg += 'бан → бан\n';
+        helpMsg += 'размут → размутить\n';
+        helpMsg += 'разбан → разбанить\n';
+        helpMsg += 'варны → показать варны\n\n';
+        helpMsg += '🔹 <b>Команды (просто в чат):</b>\n';
+        helpMsg += 'кто я → информация о себе\n';
+        helpMsg += 'кто ты → информация о боте\n';
+        helpMsg += 'стат → статистика\n';
+        helpMsg += 'лог → логи\n';
+      }
+      
+      helpMsg += '\n🖤 <b>BLACK MODER — всегда на страже порядка!</b>';
+      await ctx.reply(helpMsg, { parse_mode: 'HTML' });
+      return;
+    }
+    
+    // === ЛОГ ===
+    if (text === 'лог') {
       if (!config.ADMIN_IDS.includes(ctx.from.id)) {
-        if (text === 'кто ты' || text === 'помощь') {
-          // Разрешаем всем
-        } else {
-          return ctx.reply('⛔ Только для администраторов!');
-        }
+        return ctx.reply('⛔ Только для администраторов!');
+      }
+      const logs = moderator.getLogs(10);
+      if (logs.length === 0) {
+        return ctx.reply('📭 Логов пока нет');
+      }
+      await ctx.reply(`📋 <b>Последние логи:</b>\n\n<pre>${logs.join('\n')}</pre>`, {
+        parse_mode: 'HTML'
+      });
+      return;
+    }
+    
+    // === СТАТ ===
+    if (text === 'стат') {
+      if (!config.ADMIN_IDS.includes(ctx.from.id)) {
+        return ctx.reply('⛔ Только для администраторов!');
+      }
+      const users = moderator.users;
+      const totalUsers = users.size;
+      let totalWarns = 0;
+      let mutedUsers = 0;
+      let bannedUsers = 0;
+      
+      for (const [uid, user] of users) {
+        totalWarns += user.warns;
+        if (user.isBanned) bannedUsers++;
+        else if (user.mutedUntil > Date.now() / 1000) mutedUsers++;
       }
       
-      // === КТО ТЫ ===
-      if (text === 'кто ты') {
-        await ctx.reply(
-          `🖤 <b>BLACK MODER</b> 🖤\n\n` +
-          `👋 Я бот-модератор этого чата!\n` +
-          `🔒 Слежу за порядком 24/7\n` +
-          `⚡ Мгновенно реагирую на нарушения\n\n` +
-          `📌 <b>Мои функции:</b>\n` +
-          `• 🚫 Мат и оскорбления → предупреждение\n` +
-          `• 🔗 Спам и ссылки → предупреждение\n` +
-          `• 📊 Флуд → мут\n` +
-          `• ⚠️ Угрозы → бан\n` +
-          `• 3 предупреждения → мут\n` +
-          `• 5 предупреждений → бан\n\n` +
-          `👨‍💻 Создатель: @qixmoi`,
-          { parse_mode: 'HTML' }
-        );
-        return;
+      await ctx.reply(
+        `📊 <b>СТАТИСТИКА МОДЕРАЦИИ</b>\n\n` +
+        `👥 Всего пользователей: ${totalUsers}\n` +
+        `⚠️ Всего предупреждений: ${totalWarns}\n` +
+        `🔇 В муте: ${mutedUsers}\n` +
+        `🚫 Забанено: ${bannedUsers}\n` +
+        `📝 Логов: ${moderator.logs.length}`,
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+    
+    // === ПРОВЕРКА: это команда для бота (требует ответа на сообщение) ===
+    const isReplyCommand = text === 'варн' || 
+                          text === 'снять варн' ||
+                          text.startsWith('мут') || 
+                          text === 'бан' || 
+                          text === 'размут' ||
+                          text === 'разбан' ||
+                          text === 'варны';
+    
+    if (isReplyCommand) {
+      if (!config.ADMIN_IDS.includes(ctx.from.id)) {
+        return ctx.reply('⛔ Только для администраторов!');
       }
       
-      // === ПОМОЩЬ ===
-      if (text === 'помощь') {
-        const isAdmin = config.ADMIN_IDS.includes(ctx.from.id);
-        
-        let helpMsg = '🖤 <b>BLACK MODER — ПОМОЩЬ</b> 🖤\n\n';
-        helpMsg += '⚙️ <b>Автоматическая модерация:</b>\n';
-        helpMsg += '• 🚫 Мат и оскорбления → предупреждение\n';
-        helpMsg += '• 🔗 Спам и ссылки → предупреждение\n';
-        helpMsg += '• 📊 Флуд → мут\n';
-        helpMsg += '• ⚠️ Угрозы → бан\n';
-        helpMsg += '• 3 предупреждения → мут\n';
-        helpMsg += '• 5 предупреждений → бан\n\n';
-        
-        if (isAdmin) {
-          helpMsg += '🔹 <b>Команды (ответом на сообщение):</b>\n';
-          helpMsg += 'варн → предупреждение\n';
-          helpMsg += 'мут 5 → мут на 5 минут\n';
-          helpMsg += 'бан → бан\n';
-          helpMsg += 'размут → размутить\n';
-          helpMsg += 'разбан → разбанить\n';
-          helpMsg += 'варны → показать варны\n';
-          helpMsg += 'стат → статистика\n';
-          helpMsg += 'лог → логи\n';
-        }
-        
-        helpMsg += '\n🖤 <b>BLACK MODER — всегда на страже порядка!</b>';
-        await ctx.reply(helpMsg, { parse_mode: 'HTML' });
-        return;
-      }
-      
-      // === ЛОГ ===
-      if (text === 'лог') {
-        const logs = moderator.getLogs(10);
-        if (logs.length === 0) {
-          return ctx.reply('📭 Логов пока нет');
-        }
-        await ctx.reply(`📋 <b>Последние логи:</b>\n\n<pre>${logs.join('\n')}</pre>`, {
-          parse_mode: 'HTML'
-        });
-        return;
-      }
-      
-      // === СТАТ ===
-      if (text === 'стат') {
-        const users = moderator.users;
-        const totalUsers = users.size;
-        let totalWarns = 0;
-        let mutedUsers = 0;
-        let bannedUsers = 0;
-        
-        for (const [uid, user] of users) {
-          totalWarns += user.warns;
-          if (user.isBanned) bannedUsers++;
-          else if (user.mutedUntil > Date.now() / 1000) mutedUsers++;
-        }
-        
-        await ctx.reply(
-          `📊 <b>СТАТИСТИКА МОДЕРАЦИИ</b>\n\n` +
-          `👥 Всего пользователей: ${totalUsers}\n` +
-          `⚠️ Всего предупреждений: ${totalWarns}\n` +
-          `🔇 В муте: ${mutedUsers}\n` +
-          `🚫 Забанено: ${bannedUsers}\n` +
-          `📝 Логов: ${moderator.logs.length}`,
-          { parse_mode: 'HTML' }
-        );
-        return;
-      }
-      
-      // === ЭТО КОМАНДЫ, КОТОРЫЕ РАБОТАЮТ ОТВЕТОМ НА СООБЩЕНИЕ ===
-      // Проверяем, есть ли ответ на сообщение
       if (!ctx.message.reply_to_message) {
         return ctx.reply('⚠️ Ответь на сообщение пользователя!');
       }
       
-      const targetUid = String(ctx.message.reply_to_message.from.id);
-      const targetUsername = ctx.message.reply_to_message.from.username || 
-                            `${ctx.message.reply_to_message.from.first_name} ${ctx.message.reply_to_message.from.last_name || ''}`.trim() || 
-                            'unknown';
+      const target = ctx.message.reply_to_message.from;
+      const targetUid = String(target.id);
+      const targetName = target.username || 
+                        `${target.first_name} ${target.last_name || ''}`.trim() || 
+                        'unknown';
+      
+      // === СНЯТЬ ВАРН ===
+      if (text === 'снять варн') {
+        const user = moderator._initUser(targetUid);
+        if (user.warns > 0) {
+          user.warns -= 1;
+          moderator._log(`[СНЯТЬ ВАРН] @${targetName} (${targetUid})`);
+          await ctx.reply(
+            `✅ С пользователя @${targetName} было снято предупреждение (${user.warns + 1} → ${user.warns})`
+          );
+        } else {
+          await ctx.reply(`❌ У пользователя @${targetName} нет предупреждений`);
+        }
+        return;
+      }
       
       // === ВАРН ===
       if (text === 'варн') {
         const user = moderator._initUser(targetUid);
         user.warns += 1;
         
-        let action = 'warn';
         let extra = '';
-        
         if (user.warns >= config.MODERATION.BAN_THRESHOLD) {
           user.isBanned = true;
           user.mutedUntil = Infinity;
-          action = 'бан';
           extra = ' (автоматический бан)';
-          try {
-            await ctx.banChatMember(targetUid);
-          } catch(e) {}
+          try { await ctx.banChatMember(targetUid); } catch(e) {}
         } else if (user.warns >= config.MODERATION.MAX_WARNS) {
           const duration = Math.min(30 * user.warns, 3600);
           user.mutedUntil = Date.now() / 1000 + duration;
-          action = 'мут';
           extra = ` (автоматический мут на ${Math.round(duration/60)} мин)`;
           try {
             await ctx.restrictChatMember(targetUid, {
@@ -195,25 +243,26 @@ bot.on('text', async (ctx) => {
           } catch(e) {}
         }
         
-        moderator._log(`[ВАРН] @${targetUsername} (${targetUid})`);
-        await ctx.reply(`⚠️ @${targetUsername} получил предупреждение #${user.warns}${extra}`);
+        moderator._log(`[ВАРН] @${targetName} (${targetUid})`);
+        await ctx.reply(
+          `⚠️ @${targetName} получает предупреждение (${user.warns}/${config.MODERATION.BAN_THRESHOLD})\n` +
+          `Будет снято через 1 неделю\n` +
+          `Модератор: @${ctx.from.username || 'админ'}${extra}`
+        );
         return;
       }
       
       // === МУТ ===
       if (text.startsWith('мут')) {
         const args = text.split(' ');
-        let duration = 5; // по умолчанию 5 минут
-        
+        let minutes = 5;
         if (args.length > 1) {
-          duration = parseInt(args[1]);
-          if (isNaN(duration) || duration <= 0) {
-            return ctx.reply('⚠️ Укажи время в минутах: мут 5');
-          }
+          const parsed = parseInt(args[1]);
+          if (!isNaN(parsed) && parsed > 0) minutes = parsed;
         }
         
         const user = moderator._initUser(targetUid);
-        const seconds = duration * 60;
+        const seconds = minutes * 60;
         user.mutedUntil = Date.now() / 1000 + seconds;
         user.warns += 1;
         
@@ -227,8 +276,8 @@ bot.on('text', async (ctx) => {
           });
         } catch(e) {}
         
-        moderator._log(`[МУТ] @${targetUsername} (${targetUid}): ${duration} мин`);
-        await ctx.reply(`🔇 @${targetUsername} замучен на ${duration} минут`);
+        moderator._log(`[МУТ] @${targetName} (${targetUid}): ${minutes} мин`);
+        await ctx.reply(`🔇 @${targetName} замучен на ${minutes} минут`);
         return;
       }
       
@@ -238,20 +287,15 @@ bot.on('text', async (ctx) => {
         user.isBanned = true;
         user.mutedUntil = Infinity;
         user.warns = Math.max(user.warns, config.MODERATION.BAN_THRESHOLD);
-        
-        try {
-          await ctx.banChatMember(targetUid);
-        } catch(e) {}
-        
-        moderator._log(`[БАН] @${targetUsername} (${targetUid})`);
-        await ctx.reply(`🚫 @${targetUsername} забанен`);
+        try { await ctx.banChatMember(targetUid); } catch(e) {}
+        moderator._log(`[БАН] @${targetName} (${targetUid})`);
+        await ctx.reply(`🚫 @${targetName} забанен`);
         return;
       }
       
       // === РАЗМУТ ===
       if (text === 'размут') {
         moderator.unmuteUser(targetUid);
-        
         try {
           await ctx.restrictChatMember(targetUid, {
             can_send_messages: true,
@@ -260,36 +304,29 @@ bot.on('text', async (ctx) => {
             can_add_web_page_previews: true
           });
         } catch(e) {}
-        
-        moderator._log(`[РАЗМУТ] @${targetUsername} (${targetUid})`);
-        await ctx.reply(`🔊 @${targetUsername} размучен`);
+        moderator._log(`[РАЗМУТ] @${targetName} (${targetUid})`);
+        await ctx.reply(`🔊 @${targetName} размучен`);
         return;
       }
       
       // === РАЗБАН ===
       if (text === 'разбан') {
         moderator.unbanUser(targetUid);
-        
-        try {
-          await ctx.unbanChatMember(targetUid);
-        } catch(e) {}
-        
-        moderator._log(`[РАЗБАН] @${targetUsername} (${targetUid})`);
-        await ctx.reply(`✅ @${targetUsername} разбанен`);
+        try { await ctx.unbanChatMember(targetUid); } catch(e) {}
+        moderator._log(`[РАЗБАН] @${targetName} (${targetUid})`);
+        await ctx.reply(`✅ @${targetName} разбанен`);
         return;
       }
       
       // === ВАРНЫ ===
       if (text === 'варны') {
         const stats = moderator.getUserStatus(targetUid);
-        
         if (!stats) {
-          return ctx.reply(`📊 @${targetUsername}\n✅ Нарушений нет`);
+          return ctx.reply(`📊 @${targetName}\n✅ Нарушений нет`);
         }
-        
         await ctx.reply(
           `📊 <b>СТАТУС ПОЛЬЗОВАТЕЛЯ</b>\n\n` +
-          `👤 @${targetUsername}\n` +
+          `👤 @${targetName}\n` +
           `⚠️ Предупреждений: ${stats.warns}\n` +
           `🔇 В муте: ${stats.isMuted ? '✅ ДА' : '❌ НЕТ'}\n` +
           `🚫 Забанен: ${stats.isBanned ? '✅ ДА' : '❌ НЕТ'}\n` +
@@ -301,12 +338,10 @@ bot.on('text', async (ctx) => {
     }
     
     // === ЕСЛИ НЕ КОМАНДА — ПРОВЕРЯЕМ НА ТОКСИЧНОСТЬ ===
-    // Админов не модерят
     if (config.ADMIN_IDS.includes(ctx.from.id)) {
       return;
     }
     
-    // Пропускаем команды с /
     if (ctx.message.text.startsWith('/')) return;
     
     const chatId = ctx.chat.id;
@@ -380,7 +415,7 @@ bot.launch()
     console.log('🖤 BLACK MODER БОТ ЗАПУЩЕН! 🖤');
     console.log('📋 Токен:', config.BOT_TOKEN ? '✅ Установлен' : '❌ ОТСУТСТВУЕТ');
     console.log('👤 Админы:', config.ADMIN_IDS);
-    console.log('⚙️ Версия: BLACK MODER 3.0.0');
+    console.log('⚙️ Версия: BLACK MODER 3.1.0');
     console.log('\n📌 Бот готов к работе!');
   })
   .catch(err => {
