@@ -1,0 +1,17 @@
+{
+  "name": "telegram-moderator-bot",
+  "version": "2.0.0",
+  "description": "Полноценный бот-модератор для Telegram",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "nodemon bot.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.15.3",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
