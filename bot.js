@@ -5,7 +5,55 @@ const ChatModerator = require('./moderator');
 const bot = new Telegraf(config.BOT_TOKEN);
 const moderator = new ChatModerator(config.MODERATION);
 
-// ====== КОМАНДА /START ======
+// ====== ФУНКЦИЯ ДЛЯ ФОРМАТИРОВАНИЯ СТАТИСТИКИ (КАК IRIS) ======
+function getUserStatsText(user, stats) {
+  const now = new Date();
+  const firstSeen = new Date(2026, 6, 1); // 01.07.2026
+  
+  let text = `🖤 <b>BLACK MODER — КТО Я</b> 🖤\n\n`;
+  text += `👤 <b>Это пользователь</b> ${user.first_name || ''} ${user.last_name || ''}\n`;
+  
+  // Проверяем, является ли пользователь админом
+  if (config.ADMIN_IDS.includes(user.id)) {
+    text += `👑 <b>Телеграм-админ этого чата</b>\n\n`;
+  } else {
+    text += `📛 <b>Состоит в чате</b>\n\n`;
+  }
+  
+  text += `────────────────────\n`;
+  
+  // Ранг
+  if (config.ADMIN_IDS.includes(user.id)) {
+    text += `[5] <b>Ранг: Создатель</b>\n`;
+  } else {
+    text += `[0] <b>Ранг: Простой участник</b>\n`;
+  }
+  text += `🏅 Репутация: 0 | ⭐ 0\n\n`;
+  
+  // Даты
+  const daysDiff = Math.floor((now - firstSeen) / (1000 * 60 * 60 * 24));
+  text += `📅 Первое появление: 01.07.2026 (${daysDiff} дн)\n`;
+  text += `⏰ Последний актив: только что\n`;
+  
+  // Активность
+  if (stats) {
+    const msgCount = stats.messagesCount || 0;
+    const day = msgCount;
+    const week = Math.floor(msgCount * 3.5);
+    const month = Math.floor(msgCount * 15);
+    const all = Math.floor(msgCount * 62);
+    text += `📊 Актив (д|н|м|весь): ${day} | ${week} | ${month} | ${all}\n\n`;
+  } else {
+    text += `📊 Актив (д|н|м|весь): 0 | 0 | 0 | 0\n\n`;
+  }
+  
+  text += `────────────────────\n`;
+  text += `📝 <b>Описание</b>   🏆 <b>Награды</b>   🎯 <b>Кружки</b>   📌 <b>Закладки</b>`;
+  
+  return text;
+}
+
+// ====== СТАРТ ======
 bot.start(async (ctx) => {
   const isAdmin = config.ADMIN_IDS.includes(ctx.from.id);
   
@@ -15,29 +63,29 @@ bot.start(async (ctx) => {
   message += '⚡ Мгновенная реакция на нарушения.\n\n';
   
   if (isAdmin) {
-    message += '🔹 <b>Как использовать (ответом на сообщение):</b>\n';
+    message += '🔹 <b>Как использовать:</b>\n';
     message += '• Ответь на сообщение → "варн" → предупреждение\n';
-    message += '• Ответь на сообщение → "снять варн" → снять предупреждение\n';
+    message += '• Ответь на сообщение → "снять варн" → снять варн\n';
     message += '• Ответь на сообщение → "мут 5" → мут на 5 мин\n';
     message += '• Ответь на сообщение → "бан" → бан\n';
     message += '• Ответь на сообщение → "размут" → размутить\n';
     message += '• Ответь на сообщение → "разбан" → разбанить\n';
     message += '• Ответь на сообщение → "варны" → показать варны\n';
-    message += '• Напиши "кто я" → информация о себе\n';
-    message += '• Напиши "кто ты" → информация о боте\n';
+    message += '• Ответь на сообщение → "кто ты" → инфо о пользователе\n';
+    message += '• Напиши "кто я" → инфо о себе\n';
     message += '• Напиши "стат" → статистика\n';
     message += '• Напиши "лог" → логи\n';
   } else {
     message += '🔹 <b>Доступные команды:</b>\n';
     message += 'кто я — информация о себе\n';
-    message += 'кто ты — информация о боте\n';
+    message += 'кто ты — информация о пользователе (ответом)\n';
     message += 'помощь — помощь\n';
   }
   
   await ctx.reply(message, { parse_mode: 'HTML' });
 });
 
-// ====== ОБРАБОТЧИК ТЕКСТА ======
+// ====== ОСНОВНОЙ ОБРАБОТЧИК ======
 bot.on('text', async (ctx) => {
   try {
     const text = ctx.message.text.trim();
@@ -50,28 +98,51 @@ bot.on('text', async (ctx) => {
     if (text === 'кто я') {
       const stats = moderator.getUserStatus(uid);
       const user = ctx.from;
+      await ctx.reply(getUserStatsText(user, stats), { parse_mode: 'HTML' });
+      return;
+    }
+    
+    // === КТО ТЫ (ответом на сообщение — информация о пользователе) ===
+    if (text === 'кто ты') {
+      if (!ctx.message.reply_to_message) {
+        return ctx.reply('⚠️ Ответь на сообщение пользователя, чтобы узнать о нём!');
+      }
       
-      let info = `🖤 <b>BLACK MODER — КТО Я</b> 🖤\n\n`;
-      info += `👤 <b>Это пользователь</b> ${user.first_name || ''} ${user.last_name || ''}\n`;
-      info += `📛 <b>Телеграм-админ этого чата</b>\n\n`;
+      const target = ctx.message.reply_to_message.from;
+      const targetUid = String(target.id);
+      const stats = moderator.getUserStatus(targetUid);
+      
+      let info = `🖤 <b>BLACK MODER — КТО ТЫ</b> 🖤\n\n`;
+      info += `👤 <b>Это пользователь</b> ${target.first_name || ''} ${target.last_name || ''}\n`;
+      
+      if (config.ADMIN_IDS.includes(target.id)) {
+        info += `👑 <b>Телеграм-админ этого чата</b>\n\n`;
+      } else {
+        info += `📛 <b>Состоит в чате</b>\n\n`;
+      }
+      
       info += `────────────────────\n`;
       
-      if (config.ADMIN_IDS.includes(ctx.from.id)) {
-        info += `👑 <b>Ранг: Создатель</b>\n`;
+      if (config.ADMIN_IDS.includes(target.id)) {
+        info += `[5] <b>Ранг: Создатель</b>\n`;
       } else {
         info += `[0] <b>Ранг: Простой участник</b>\n`;
       }
       info += `🏅 Репутация: 0 | ⭐ 0\n\n`;
       
       const now = new Date();
-      const firstSeen = new Date(2026, 5, 30); // 30.06.2026
+      const firstSeen = new Date(2026, 6, 1);
       const daysDiff = Math.floor((now - firstSeen) / (1000 * 60 * 60 * 24));
-      
-      info += `📅 Первое появление: 30.06.2026 (${daysDiff} дн)\n`;
+      info += `📅 Первое появление: 01.07.2026 (${daysDiff} дн)\n`;
       info += `⏰ Последний актив: только что\n`;
       
       if (stats) {
-        info += `📊 Актив (д|н|м|весь): ${stats.messagesCount || 0} | ${Math.floor((stats.messagesCount || 0) * 4.5)} | ${Math.floor((stats.messagesCount || 0) * 25)} | ${Math.floor((stats.messagesCount || 0) * 55)}\n\n`;
+        const msgCount = stats.messagesCount || 0;
+        const day = msgCount;
+        const week = Math.floor(msgCount * 3.5);
+        const month = Math.floor(msgCount * 15);
+        const all = Math.floor(msgCount * 62);
+        info += `📊 Актив (д|н|м|весь): ${day} | ${week} | ${month} | ${all}\n\n`;
       } else {
         info += `📊 Актив (д|н|м|весь): 0 | 0 | 0 | 0\n\n`;
       }
@@ -80,26 +151,6 @@ bot.on('text', async (ctx) => {
       info += `📝 <b>Описание</b>   🏆 <b>Награды</b>   🎯 <b>Кружки</b>   📌 <b>Закладки</b>`;
       
       await ctx.reply(info, { parse_mode: 'HTML' });
-      return;
-    }
-    
-    // === КТО ТЫ ===
-    if (text === 'кто ты') {
-      await ctx.reply(
-        `🖤 <b>BLACK MODER</b> 🖤\n\n` +
-        `👋 Я бот-модератор этого чата!\n` +
-        `🔒 Слежу за порядком 24/7\n` +
-        `⚡ Мгновенно реагирую на нарушения\n\n` +
-        `📌 <b>Мои функции:</b>\n` +
-        `• 🚫 Мат и оскорбления → предупреждение\n` +
-        `• 🔗 Спам и ссылки → предупреждение\n` +
-        `• 📊 Флуд → мут\n` +
-        `• ⚠️ Угрозы → бан\n` +
-        `• 3 предупреждения → мут\n` +
-        `• 5 предупреждений → бан\n\n` +
-        `👨‍💻 Создатель: @qixmoi`,
-        { parse_mode: 'HTML' }
-      );
       return;
     }
     
@@ -124,10 +175,10 @@ bot.on('text', async (ctx) => {
         helpMsg += 'бан → бан\n';
         helpMsg += 'размут → размутить\n';
         helpMsg += 'разбан → разбанить\n';
-        helpMsg += 'варны → показать варны\n\n';
+        helpMsg += 'варны → показать варны\n';
+        helpMsg += 'кто ты → информация о пользователе\n\n';
         helpMsg += '🔹 <b>Команды (просто в чат):</b>\n';
         helpMsg += 'кто я → информация о себе\n';
-        helpMsg += 'кто ты → информация о боте\n';
         helpMsg += 'стат → статистика\n';
         helpMsg += 'лог → логи\n';
       }
@@ -181,9 +232,10 @@ bot.on('text', async (ctx) => {
       return;
     }
     
-    // === ПРОВЕРКА: это команда для бота (требует ответа на сообщение) ===
+    // === КОМАНДЫ, КОТОРЫЕ РАБОТАЮТ ОТВЕТОМ НА СООБЩЕНИЕ ===
     const isReplyCommand = text === 'варн' || 
                           text === 'снять варн' ||
+                          text === 'снять варны' ||
                           text.startsWith('мут') || 
                           text === 'бан' || 
                           text === 'размут' ||
@@ -206,7 +258,7 @@ bot.on('text', async (ctx) => {
                         'unknown';
       
       // === СНЯТЬ ВАРН ===
-      if (text === 'снять варн') {
+      if (text === 'снять варн' || text === 'снять варны') {
         const user = moderator._initUser(targetUid);
         if (user.warns > 0) {
           user.warns -= 1;
@@ -337,7 +389,7 @@ bot.on('text', async (ctx) => {
       }
     }
     
-    // === ЕСЛИ НЕ КОМАНДА — ПРОВЕРЯЕМ НА ТОКСИЧНОСТЬ ===
+    // === АВТОМОДЕРАЦИЯ ===
     if (config.ADMIN_IDS.includes(ctx.from.id)) {
       return;
     }
@@ -415,7 +467,7 @@ bot.launch()
     console.log('🖤 BLACK MODER БОТ ЗАПУЩЕН! 🖤');
     console.log('📋 Токен:', config.BOT_TOKEN ? '✅ Установлен' : '❌ ОТСУТСТВУЕТ');
     console.log('👤 Админы:', config.ADMIN_IDS);
-    console.log('⚙️ Версия: BLACK MODER 3.1.0');
+    console.log('⚙️ Версия: BLACK MODER 3.2.0');
     console.log('\n📌 Бот готов к работе!');
   })
   .catch(err => {
